@@ -65,30 +65,25 @@ func (n *Network) CalculateOutputs(inputs []float64) {
 //CalculateError calculates the cost function and then uses this to update the weights of the output nodes and then back propegate to each hidden node.
 func (n *Network) CalculateError(inputs []float64, expectedOutputs []float64) {
 	var outputErrorResults []float64
+	//Calculate Output nodes error vs expected result
 	for index, outputNode := range n.OutputNodes {
 		errorResult := outputNode.Output * (1 - outputNode.Output) * (expectedOutputs[index] - outputNode.Output)
 		outputErrorResults = append(outputErrorResults, errorResult)
 		n.OutputNodes[index].ErrorGradient = errorResult
 	}
-	//fmt.Printf("OUTPUT ERROR: %f\n", outputErrorResults)
-	var hiddenNodeErrorResults []float64
-	var hiddenNodeValues []float64
 
+	//Calculate hidden nodes error based on Output node error times weight
 	for hiddenIndex, hiddenNode := range n.Nodes {
-		hiddenNodeValues = append(hiddenNodeValues, hiddenNode.Output)
 		var weightedError float64
 		weightedError = 0
+
 		for outputIndex, outputNode := range n.OutputNodes {
 			weightedError += outputErrorResults[outputIndex] * outputNode.Weights[hiddenIndex].Weight
 		}
 
 		errorResult := hiddenNode.Output * (1 - hiddenNode.Output) * weightedError
-		hiddenNodeErrorResults = append(hiddenNodeErrorResults, errorResult)
 		n.Nodes[hiddenIndex].ErrorGradient = errorResult
-		//fmt.Printf("HIDDEN ERROR: %f\n", hiddenNode.ErrorGradient)
 	}
-	//fmt.Printf("HIDDEN ERROR: %f\n", hiddenNodeErrorResults)
-
 }
 
 //UpdateWeightsBasedOnError will update each node in the network based on the current node input and errorGradient
@@ -110,8 +105,28 @@ func (n *Network) Clone() Network {
 	for _, node := range n.Nodes {
 		returnNetwork.Nodes = append(returnNetwork.Nodes, node.clone())
 	}
-	return returnNetwork
+	returnNetwork.Iteration = n.Iteration
+	for _, input := range n.Inputs {
+		returnNetwork.Inputs = append(returnNetwork.Inputs, input)
+	}
+	for _, expectedOutputs := range n.ExpectedOutputs {
+		returnNetwork.ExpectedOutputs = append(returnNetwork.ExpectedOutputs, expectedOutputs)
+	}
 
+	return returnNetwork
+}
+
+//ClearTrainingData will remove all input / outputs that relate to a specific training step
+func (n *Network) ClearTrainingData() {
+	n.Iteration = 0
+	n.Inputs = nil
+	n.ExpectedOutputs = nil
+	for i := range n.Nodes {
+		n.Nodes[i].clearTrainingData()
+	}
+	for i := range n.OutputNodes {
+		n.OutputNodes[i].clearTrainingData()
+	}
 }
 
 //Node represents a network node
@@ -148,15 +163,9 @@ func (n *Node) calculate(inputs []float64) (err error) {
 
 func (n *Node) updateWeightBasedOnError() {
 	for index := range n.Weights {
-		//fmt.Printf("Updating Weight: %f\n", n.Weights[index])
-		//fmt.Printf("ErrorGradient: %f\n", n.ErrorGradient)
-		//fmt.Printf("Input: %f\n", n.Inputs[index])
 		n.Weights[index].Weight += 1 * n.Inputs[index] * n.ErrorGradient
-		//fmt.Printf("Updated Weight: %f\n", n.Weights[index])
 	}
-	//fmt.Printf("Updating BiasWeight: %f\n", n.BiasWeight)
 	n.BiasWeight += 1 * -1 * n.ErrorGradient
-	//fmt.Printf("Updated BiasWeight: %f\n", n.BiasWeight)
 }
 
 func (n *Node) clone() Node {
@@ -175,4 +184,10 @@ func (n *Node) clone() Node {
 		clone.Inputs = append(clone.Inputs, input)
 	}
 	return clone
+}
+
+func (n *Node) clearTrainingData() {
+	n.Inputs = nil
+	n.Output = 0
+	n.ErrorGradient = 0
 }
